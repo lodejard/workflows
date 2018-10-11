@@ -1,0 +1,6 @@
+devops:
+  organization: atlas-test
+  project: atlas-app
+  
+includeExtendedInfo: true
+recurse: true

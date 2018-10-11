@@ -1,0 +1,76 @@
+
+values: {{{ json }}}
+
+operations:
+
+- message: Finding project {{ devops.project }}
+  request: apis/devops/core-projects-list.yaml
+  output:
+    data:
+      project: ( result.body.value[?name=='{{ devops.project }}'] | [0] )
+    continuationToken: (result.headers."x-ms-continuationtoken"[0])
+  repeat:
+    condition: ( data.project == null && continuationToken != null )
+
+- message: Listing security namespaces
+  request: apis/devops/security-namespaces-query.yaml
+  output:
+    data:
+      security:
+        namespaces: (result.body.value)
+
+- message: Foreach namespace
+  values:
+    foreach: (data.security.namespaces[?name=='ReleaseManagement' && namespaceId=='c788c23e-1b46-4162-8f5e-d7585343b5de'])
+  operations:
+  - values:
+      namespaceId: (foreach[0].namespaceId)
+      token: (data.project.id)
+    request: apis/devops/security-acl-query.yaml
+    output:
+      temp:
+        acl: (result.body.value)
+  - condition: (length(temp.acl) != `0`)
+    operations:
+
+    - message: Identity batch query
+      values:
+        descriptors: ( distinct( temp.acl[].acesDictionary.*.descriptor[] ) )
+      request: apis/devops/identitybatch-query.yaml
+      output:
+        temp:
+          identityhash: ( to_object(zip(descriptors, result.body.value)) )
+          identity: (result.body.value)
+
+    - values:
+        accesscontrollist: (temp.acl)
+        identityhash: (temp.identityhash)
+      template: rewrite-access.yaml
+      write: rewrite-access.yaml
+
+    - values:
+        actions: (foreach[0].actions)
+        accesscontrollist: (temp.acl)
+        identityhash: (temp.identityhash)
+      template: rewrite-access.yaml
+      output:
+        temp:
+          access: (result)
+  - output:
+      result:
+        namespace: (foreach[0])
+        access:
+          count: (length(temp.access))
+          value: (temp.access)
+        identity:
+          count: (length(temp.identity))
+          value: (temp.identity)
+  output:
+    foreach: (foreach[1:])
+    results: ( [results||`[]`, [result]][] )
+  repeat:
+    condition: (foreach[0] != null)
+
+
+output:
+  results: (results)

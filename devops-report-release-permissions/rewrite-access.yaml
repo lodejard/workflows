@@ -1,0 +1,31 @@
+{{# each accesscontrollist }}
+- inheritPermissions: {{ inheritPermissions }}
+  token: {{ token }}
+  includeExtendedInfo: {{ includeExtendedInfo }}
+  aces:
+  {{# each acesDictionary }}
+{{# query "( items.$1 )" descriptor items=../../identityhash}}
+  {{# if customDisplayName }}
+  - displayName: "{{ customDisplayName }}"
+  {{ else }}
+  {{# if properties.Mail.$value }}
+  - displayName: "{{ providerDisplayName }} ({{ properties.Mail.$value }})"
+  {{ else }}
+  - displayName: "{{ providerDisplayName }}"
+  {{/ if }}
+  {{/ if}}
+{{ else }}
+  - displayName: "{{ descriptor }}"
+{{/ query }}
+    actions: 
+    {{# query "bits(allow)" }}
+    - {{{ query "actions[?bit==`$1`].name|[0]" @value actions=../../../actions }}}
+    {{/ query }}
+    {{# query "bits(deny)" }}
+    - ~{{{ query "actions[?bit==`$1`].name|[0]" @value actions=../../../actions }}}
+    {{/ query }}
+    {{# each @value }}
+    "{{ @key }}": {{{ json }}}
+    {{/ each}}
+  {{/ each }}
+{{/ each }}
