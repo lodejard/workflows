@@ -32,7 +32,7 @@ operations:
       resourceGroups: (result.body.value)    
       nextLink: (result.body.nextLink)
 
-  - message: Listing most resource groups
+  - message: Listing more resource groups
     condition: (nextLink != null)
     request: apis/azure/nextlink.yaml
     output:
