@@ -1,0 +1,55 @@
+
+operations:
+
+# list all subscriptions
+- message: Listing subscriptions
+  request: apis/azure/subscriptions-list.yaml
+  output:
+    subscriptions: (result.body.value)    
+    nextLink: (result.body.nextLink)
+
+- message: Listing subscriptions
+  condition: (nextLink != null)
+  request: apis/azure/nextlink.yaml
+  output:
+    subscriptions: ([subscriptions, result.body.value][])
+    nextLink: (result.body.nextLink)
+  repeat:
+    condition: (nextLink != null)
+
+# foreach subscription
+- values:
+    subscription: (subscriptions[0])
+    subscriptions: (subscriptions[1:])
+  condition: (subscription != null)
+  operations:
+
+  # list all resource groups
+  - message: Listing resource groups
+    values:
+      azure:
+        subscription: (subscription.subscriptionId)
+    request: apis/azure/resourcegroups-list.yaml
+    output:
+      resourceGroups: (result.body.value)    
+      nextLink: (result.body.nextLink)
+
+  - message: Listing resource groups
+    condition: (nextLink != null)
+    request: apis/azure/nextlink.yaml
+    output:
+      resourceGroups: ([resourceGroups, result.body.value][])
+      nextLink: (result.body.nextLink)
+    repeat:
+      condition: (nextLink != null)
+
+  # merge the results and proceed to the next subscription
+  output:
+    results: ( merge(results||`{}`, to_object( [[ subscription.subscriptionId, {subscription:subscription, resourceGroups:resourceGroups} ]] )) )
+    subscription: (subscriptions[0])
+    subscriptions: (subscriptions[1:])
+  repeat:
+    condition: (subscription != null)
+
+output:
+  results: (results)
