@@ -1,0 +1,15 @@
+azure:
+  # tenant: 
+  # subscription: 
+  location: westus2
+  resourceGroup: atlas-arm-example
+  deploymentName: atlas-example-deployment
+
+storage:
+  accountPrefix: atlasdemo
+  containerName: logs
+  kind: StorageV2
+  sku:
+    name: Standard_LRS
+    tier: Standard
+  accessTier: Hot
