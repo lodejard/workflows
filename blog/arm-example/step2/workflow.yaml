@@ -1,0 +1,12 @@
+operations:
+- message: Create or update resource group
+  request: ResourceGroups_CreateOrUpdate.yaml
+
+- message: Create ARM template deployment
+  values:
+    deployment:
+      template: {{> azuredeploy.json }}
+      parameters:
+        storageAccountName:
+          value: myuniquename1234
+  request: Deployments_CreateOrUpdate.yaml
