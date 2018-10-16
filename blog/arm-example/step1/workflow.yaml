@@ -1,0 +1,4 @@
+operations:
+- message: Create or update resource group
+  request: ResourceGroups_CreateOrUpdate.yaml
+  
