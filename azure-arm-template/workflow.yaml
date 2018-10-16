@@ -1,0 +1,63 @@
+values:
+  request:
+    auth:
+      tenant: ( azure.tenant )
+    path:
+      subscriptionId: ( azure.subscription )
+      resourceGroupName: ( azure.resourceGroup )
+      deploymentName: ( azure.deploymentName )
+  arm:
+    template: {{> templates/azuredeploy.json }}
+    parameters:
+      storageAccountPrefix:
+        value: ( storage.accountPrefix )
+      containerName:
+        value: ( storage.containerName )
+
+operations:
+- message: Create or update resource group
+  values:
+    request:
+      body:
+        location: ( azure.location )
+  request: apis/azure/ResourceGroups_CreateOrUpdate.yaml
+
+- message: Create deployment
+  values:
+    request:
+      body: 
+        properties:
+          mode: Incremental
+          template: ( arm.template )
+          parameters: ( arm.parameters )
+  request: apis/azure/Deployments_CreateOrUpdate.yaml
+  catch:
+    condition: ( result.status == `400` )
+    output:
+      failure: ( result.body.error )
+
+- message: Monitoring deployment...
+  condition: ( failure == null )
+  request: apis/azure/Deployments_Get.yaml
+  output:
+    failure: ( result.body.properties.error )
+    provisioningState: ( result.body.properties.provisioningState )
+    deployment:
+      outputs: ( result.body.properties.outputs )
+      outputResources: ( result.body.properties.outputResources )
+  repeat:
+    condition: ( contains(['Accepted', 'Running'], provisioningState) )
+    delay: PT5S
+    timeout: PT4M
+  catch:
+    condition: ( result.status == `400` )
+    output:
+      failure: ( result.body.error )
+
+- message: ( ['Failure ', failure.code] )
+  condition: ( failure != null )
+  throw: 
+    message: ( failure.message )
+    details: ( failure )
+
+output: (deployment)
