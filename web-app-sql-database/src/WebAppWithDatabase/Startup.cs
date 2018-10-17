@@ -32,15 +32,15 @@ namespace WebAppWithDatabase
 
             services.AddDbContext<BloggingContext>(options =>
             {
-                if (HostingEnvironment.IsDevelopment())
-                {
-                    var connection = "Data Source=App_Data\\database.db";
-                    options.UseSqlite(connection);
-                }
-                else
-                {
+                //if (HostingEnvironment.IsDevelopment())
+                //{
+                //    var connection = "Data Source=App_Data\\database.db";
+                //    options.UseSqlite(connection);
+                //}
+                //else
+                //{
                     options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection"));
-                }
+                //}
             });
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
