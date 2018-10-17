@@ -18,6 +18,13 @@ namespace WebAppWithDatabase.Controllers
             _context = context;
         }
 
+        public IActionResult Migrate()
+        {    
+            _context.Database.Migrate();
+            
+            return RedirectToAction(nameof(Index));
+        }
+
         // GET: Blogs
         public async Task<IActionResult> Index()
         {
