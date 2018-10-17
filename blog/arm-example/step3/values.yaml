@@ -1,0 +1,4 @@
+azure:
+  location: westus2
+  resourceGroup: atlas-arm-example
+  deploymentName: atlas-deployment

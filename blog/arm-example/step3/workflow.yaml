@@ -1,0 +1,32 @@
+# secrets - {{ secret azure.subscription }} {{ secret azure.tenant }}
+
+operations:
+- message: Create or update resource group
+  request: ResourceGroups_CreateOrUpdate.yaml
+
+- message: Create ARM template deployment
+  values:
+    deployment:
+      template: {{> azuredeploy.json }}
+      parameters:
+        storageAccountName:
+          value: myuniquename1234
+  request: Deployments_CreateOrUpdate.yaml
+
+- message: Monitoring deployment...
+  request: Deployments_Get.yaml
+  output:
+    deployment: (result.body.properties)
+  repeat:
+    condition: ( contains(['Accepted', 'Running'], deployment.provisioningState) )
+    delay: PT5S
+    timeout: PT18M
+
+- message: Deployment failed
+  condition: (deployment.provisioningState != 'Succeeded')
+  throw:
+    message: Deployment failed
+    details:
+      provisioningState: (deployment.provisioningState)
+      error: (deployment.error)
+      correlationId: (deployment.correlationId)
