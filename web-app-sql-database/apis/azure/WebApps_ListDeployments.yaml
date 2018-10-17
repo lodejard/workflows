@@ -1,0 +1,9 @@
+
+# https://docs.microsoft.com/en-us/rest/api/resources/deployments/deployments_get
+
+method: GET
+url: https://management.azure.com/subscriptions/{{ request.path.subscriptionId }}/resourcegroups/{{ request.path.resourceGroupName }}/providers/Microsoft.Web/sites/{{ request.path.name }}/deployments?api-version=2018-02-01
+auth:
+  tenant: {{ request.auth.tenant }}
+  resource: https://management.azure.com/
+  client: 04b07795-8ddb-461a-bbee-02f9e1bf7b46 # Azure CLI

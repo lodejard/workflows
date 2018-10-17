@@ -1,0 +1,10 @@
+
+# https://docs.microsoft.com/en-us/rest/api/resources/deployments/deployments_get
+
+method: POST
+url: https://{{ request.path.name }}.scm.azurewebsites.net/deploy
+auth:
+  tenant: {{ request.auth.tenant }}
+  resource: https://management.core.windows.net/
+  client: 04b07795-8ddb-461a-bbee-02f9e1bf7b46 # Azure CLI
+body: {{{ json request.body }}}

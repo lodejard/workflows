@@ -42,8 +42,8 @@ operations:
     failure: ( result.body.properties.error )
     provisioningState: ( result.body.properties.provisioningState )
     deployment:
-      outputs: ( result.body.properties.outputs )
       outputResources: ( result.body.properties.outputResources )
+      outputs: ( result.body.properties.outputs )
   repeat:
     condition: ( contains(['Accepted', 'Running'], provisioningState) )
     delay: PT15S
@@ -59,10 +59,29 @@ operations:
     message: ( failure.message )
     details: ( failure )
 
+- message: Web app deployment sync
+  values:
+    request:
+      path:
+        name: ( deployment.outputs.siteName.value )
+  operations:
+  - message: Listing deployments
+    request: apis/azure/WebApps_ListDeployments.yaml
+
+  - message: Calling deploy hook
+    values:
+      request:
+        body:
+          format: basic
+          url: "{{ app.sourcecontrol.repoUrl }}"          
+    request: apis/scm/WebApps_Deploy.yaml
+
+  - message: Listing deployments
+    request: apis/azure/WebApps_ListDeployments.yaml
+
 - message: Running database migration
   values:
     request:
-      siteUri: ( join('', ['http://', deployment.outputs.siteUri.value]) )
+      siteUri: ( join('', ['http://', deployment.outputs.siteUri.value.to_string(@)]) )
   request: apis/app/Blogs_Migrate.yaml
 
-output: (deployment)
