@@ -136,7 +136,7 @@
         "properties": {
           "name": "[variables('webSiteName')]",
           "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('hostingPlanName'))]",
-          "PROJECT": "src/web-app-sql-database/web-app-sql-database.csproj"
+          "PROJECT": "{{ app.sourcecontrol.project }}"
         },
         "resources": [
           {
@@ -162,8 +162,8 @@
               "[resourceId('Microsoft.Web/sites/config', variables('webSiteName'), 'connectionstrings')]"
             ],
             "properties": {
-              "repoUrl": "https://github.com/lodejard/workflows.git",
-              "branch": "master",
+              "repoUrl": "{{ app.sourcecontrol.repoUrl }}",
+              "branch": "{{ app.sourcecontrol.branch }}",
               "IsManualIntegration": true
             }
           }

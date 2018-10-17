@@ -6,10 +6,6 @@ values:
       subscriptionId: ( azure.subscription )
       resourceGroupName: ( azure.resourceGroup )
       deploymentName: {{ azure.deploymentName }}-{{ guid (datetime add="PT0S") }}
-  arm:
-    template: {{> templates/201-web-app-sql-database/azuredeploy.json }}
-    parameters:
-      
 
 operations:
 - message: Create or update resource group
@@ -25,6 +21,8 @@ operations:
       body: 
         properties:
           mode: Incremental
+          debugSetting:
+            detailLevel: requestContent,responseContent
           template: {{> templates/201-web-app-sql-database/azuredeploy.json }}
           parameters: 
             sqlAdministratorLogin:
@@ -60,5 +58,11 @@ operations:
   throw: 
     message: ( failure.message )
     details: ( failure )
+
+- message: Running database migration
+  values:
+    request:
+      siteUri: ( join('', ['http://', deployment.outputs.siteUri.value]) )
+  request: apis/app/Blogs_Migrate.yaml
 
 output: (deployment)

@@ -1,0 +1,5 @@
+
+# https://docs.microsoft.com/en-us/rest/api/resources/deployments/deployments_get
+
+method: GET
+url: {{ request.siteUri }}/Blogs/Migrate

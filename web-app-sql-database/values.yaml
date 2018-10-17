@@ -4,3 +4,9 @@ azure:
   location: westus2
   resourceGroup: atlas-web-app-sql-database
   deploymentName: atlas-deployment
+
+app:
+  sourcecontrol:
+    repoUrl: https://github.com/lodejard/workflows.git
+    branch: web-app-sql-database
+    project: web-app-sql-database\src\WebAppWithDatabase\WebAppWithDatabase.csproj
