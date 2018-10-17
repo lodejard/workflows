@@ -1,6 +1,15 @@
 # secrets - {{ secret azure.subscription }} {{ secret azure.tenant }}
 
 operations:
+- condition: (azure.tenant == null)
+  output: {missing: {azure: {tenant: 'YOUR-TENANT-ID or --set azure.tenant=YOUR-TENANT-ID'}}}
+- condition: (azure.subscription == null)
+  output: {missing: {azure: {subscription: 'YOUR-SUBSCRIPTION-ID or --set azure.subscription=YOUR-SUBSCRIPTION-ID'}}}
+- condition: (storage.name == null)
+  output: {missing: {storage: {name: 'UNIQUE-STORAGE-ACCOUNT-NAME or --set storage.name=UNIQUE-STORAGE-ACCOUNT-NAME'}}}
+- condition: (missing != null)
+  throw: {message: The following must be provided by values.yaml in your working directory or be --set on the command line, details: (missing)}
+
 - message: Create or update resource group
   request: ResourceGroups_CreateOrUpdate.yaml
 
@@ -10,5 +19,5 @@ operations:
       template: {{> azuredeploy.json }}
       parameters:
         storageAccountName:
-          value: myuniquename1234
+          value: ( storage.name )
   request: Deployments_CreateOrUpdate.yaml

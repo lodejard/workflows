@@ -19,7 +19,7 @@ operations:
       template: {{> azuredeploy.json }}
       parameters:
         storageAccountName:
-          value: {{ storage.name }}
+          value: ( storage.name )
   request: Deployments_CreateOrUpdate.yaml
 
 - message: Monitoring deployment...
