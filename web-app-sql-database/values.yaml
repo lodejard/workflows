@@ -1,0 +1,6 @@
+azure:
+  # tenant: 
+  # subscription: 
+  location: westus2
+  resourceGroup: atlas-web-app-sql-database
+  deploymentName: atlas-deployment

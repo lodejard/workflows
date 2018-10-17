@@ -1,0 +1,64 @@
+values:
+  request:
+    auth:
+      tenant: ( azure.tenant )
+    path:
+      subscriptionId: ( azure.subscription )
+      resourceGroupName: ( azure.resourceGroup )
+      deploymentName: {{ azure.deploymentName }}-{{ guid (datetime add="PT0S") }}
+  arm:
+    template: {{> templates/201-web-app-sql-database/azuredeploy.json }}
+    parameters:
+      
+
+operations:
+- message: Create or update resource group
+  values:
+    request:
+      body:
+        location: ( azure.location )
+  request: apis/azure/ResourceGroups_CreateOrUpdate.yaml
+
+- message: Create deployment
+  values:
+    request:
+      body: 
+        properties:
+          mode: Incremental
+          template: {{> templates/201-web-app-sql-database/azuredeploy.json }}
+          parameters: 
+            sqlAdministratorLogin:
+              value: azuresql
+            sqlAdministratorLoginPassword:
+              value: "{{ secret (guid provider="RNGCryptoServiceProvider") }}"
+  request: apis/azure/Deployments_CreateOrUpdate.yaml
+  catch:
+    condition: ( result.status == `400` )
+    output:
+      failure: ( result.body.error )
+
+- message: Monitoring deployment...
+  condition: ( failure == null )
+  request: apis/azure/Deployments_Get.yaml
+  output:
+    failure: ( result.body.properties.error )
+    provisioningState: ( result.body.properties.provisioningState )
+    deployment:
+      outputs: ( result.body.properties.outputs )
+      outputResources: ( result.body.properties.outputResources )
+  repeat:
+    condition: ( contains(['Accepted', 'Running'], provisioningState) )
+    delay: PT15S
+    timeout: PT38M
+  catch:
+    condition: ( result.status == `400` )
+    output:
+      failure: ( result.body.error )
+
+- message: ( ['Failure ', failure.code] )
+  condition: ( failure != null )
+  throw: 
+    message: ( failure.message )
+    details: ( failure )
+
+output: (deployment)
