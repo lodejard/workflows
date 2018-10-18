@@ -7,13 +7,15 @@ app:
   resourceGroup: atlas-web-app-sql-database
   sourcecontrol:
     repoUrl: https://github.com/lodejard/workflows.git
-    branch: web-app-sql-database
+    branch: master
     project: web-app-sql-database\src\WebAppWithDatabase\WebAppWithDatabase.csproj
 
 storage:
   resourceGroup: atlas-web-app-sql-database-bacpac
   accountPrefix: bacpac
   containerName: exports
+  #exportName: filename.bacpac # or --set storage.exportName=sampledb.bacpac
+  #importName: filename.bacpac # or --set storage.importName=sampledb.bacpac
   kind: StorageV2
   sku:
     name: Standard_LRS

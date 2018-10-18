@@ -8,7 +8,7 @@ operations:
         properties:          
           template: ( result )
           
-- message: Create resource group
+- message: Creating resource group
   values:
     request:
       path:
@@ -16,8 +16,13 @@ operations:
       body:
         location: ( deployment.location )
   request: apis/azure/ResourceGroups_CreateOrUpdate.yaml
+  catch:
+    condition: ( result.status == `400` || result.status == `409`)
+    output:
+      failure: ( result.body.error )
 
-- message: Create deployment
+- message: Creating deployment
+  condition: ( failure == null )
   values:
     request:
       path:

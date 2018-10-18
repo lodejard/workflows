@@ -12,7 +12,7 @@ operations:
 
 # Deploy arm template templates/101-storage-blob-container/azuredeploy.json
 
-- message: Deploy storage account
+- message: Deploying storage account
   values:
     deployment:
       location: ( azure.location )
@@ -120,6 +120,6 @@ operations:
         export:
           properties: ( result.body.properties | result.body )
     repeat:
-      condition: ( database.export.properties.status == 'Pending' || starts_with(database.export.properties.status, 'Running') )
+      condition: ( database.export.properties.status == 'Pending' || starts_with(to_string(database.export.properties.status), 'Running') )
       delay: PT15S
       timeout: PT38M
