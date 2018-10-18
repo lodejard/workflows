@@ -4,54 +4,137 @@ values:
       tenant: ( azure.tenant )
     path:
       subscriptionId: ( azure.subscription )
-      resourceGroupName: ( azure.resourceGroup )
-      deploymentName: {{ azure.deploymentName }}-{{ guid (datetime add="PT0S") }}
+  database:
+    administratorLogin: azuresql
+    administratorLoginPassword: "{{ secret (guid provider="RNGCryptoServiceProvider") }}"
 
 operations:
-- message: Create or update resource group
-  values:
-    request:
-      body:
-        location: ( azure.location )
-  request: apis/azure/ResourceGroups_CreateOrUpdate.yaml
 
-- message: Create deployment
-  values:
-    request:
-      body: 
-        properties:
-          mode: Incremental
-          debugSetting:
-            detailLevel: requestContent,responseContent
-          template: {{> templates/201-web-app-sql-database/azuredeploy.json }}
-          parameters: 
-            sqlAdministratorLogin:
-              value: azuresql
-            sqlAdministratorLoginPassword:
-              value: "{{ secret (guid provider="RNGCryptoServiceProvider") }}"
-  request: apis/azure/Deployments_CreateOrUpdate.yaml
-  catch:
-    condition: ( result.status == `400` )
-    output:
-      failure: ( result.body.error )
+# Deploy arm template templates/101-storage-blob-container/azuredeploy.json
 
-- message: Monitoring deployment...
+- message: Deploy storage account
   condition: ( failure == null )
-  request: apis/azure/Deployments_Get.yaml
-  output:
-    failure: ( result.body.properties.error )
-    provisioningState: ( result.body.properties.provisioningState )
-    deployment:
-      outputResources: ( result.body.properties.outputResources )
-      outputs: ( result.body.properties.outputs )
-  repeat:
-    condition: ( contains(['Accepted', 'Running'], provisioningState) )
-    delay: PT15S
-    timeout: PT38M
-  catch:
-    condition: ( result.status == `400` )
+  values:
+    request:
+      path:
+        resourceGroupName: ( storage.resourceGroup )
+        deploymentName: deploy-storage-account-{{ guid (datetime add="PT0S") }}
+  operations:
+  - message: Create resource group
+    values:
+      request:
+        body:
+          location: ( azure.location )
+    request: apis/azure/ResourceGroups_CreateOrUpdate.yaml
+
+  - message: Create deployment
+    values:
+      request:
+        body: 
+          properties:
+            mode: Incremental
+            template: {{> templates/101-storage-blob-container/azuredeploy.json }}
+            parameters: 
+              storageAccountPrefix:
+                value: ( storage.accountPrefix )
+              containerName:
+                value: ( storage.containerName )
+    request: apis/azure/Deployments_CreateOrUpdate.yaml
+    catch:
+      condition: ( result.status == `400` )
+      output:
+        failure: ( result.body.error )
+
+  - message: Monitoring deployment...
+    condition: ( failure == null )
+    request: apis/azure/Deployments_Get.yaml
     output:
-      failure: ( result.body.error )
+      failure: ( result.body.properties.error )
+      provisioningState: ( result.body.properties.provisioningState )
+      step1:
+        outputResources: ( result.body.properties.outputResources )
+        outputs: ( result.body.properties.outputs )
+    repeat:
+      condition: ( contains(['Accepted', 'Running'], provisioningState) )
+      delay: PT15S
+      timeout: PT38M
+    catch:
+      condition: ( result.status == `400` )
+      output:
+        failure: ( result.body.error )
+
+  - message: Fetching storage account keys
+    condition: ( failure == null && (storage.importName != null || storage.exportName != null) )
+    values:
+      request:
+        path:
+          resourceGroupName: ( storage.resourceGroup )
+          storageAccountName: ( step1.outputs.storageAccountName.value )
+    request: apis/azure/Storage_ListKeys.yaml
+    output:
+      storage:
+        key: ( result.body.keys[0].value )
+
+# Deploy templates/201-web-app-sql-database/azuredeploy.json
+
+- message: Deploy web app and sql database
+  condition: ( failure == null )
+  values:
+    request:
+      path:
+        resourceGroupName: ( app.resourceGroup )
+        deploymentName: deploy-web-app-sql-database-{{ guid (datetime add="PT0S") }}
+  operations:
+  - message: Create resource group
+    values:
+      request:
+        body:
+          location: ( azure.location )
+    request: apis/azure/ResourceGroups_CreateOrUpdate.yaml
+
+  - message: Generating deployment
+    template: templates/201-web-app-sql-database/azuredeploy.json
+    output:
+      deployment:
+        mode: Incremental
+        template: ( result )
+        parameters: 
+          sqlAdministratorLogin:
+            value: ( database.administratorLogin )
+          sqlAdministratorLoginPassword:
+            value: "( database.administratorLoginPassword )"
+
+  - message: Creating deployment
+    values:
+      request:
+        body: 
+          properties: ( deployment )
+    request: apis/azure/Deployments_CreateOrUpdate.yaml
+    catch:
+      condition: ( result.status == `400` )
+      output:
+        failure: ( result.body.error )
+
+  - output: 
+      deployment: null
+
+  - message: Monitoring deployment...
+    condition: ( failure == null )
+    request: apis/azure/Deployments_Get.yaml
+    output:
+      failure: ( result.body.properties.error )
+      provisioningState: ( result.body.properties.provisioningState )
+      step2:
+        outputResources: ( result.body.properties.outputResources )
+        outputs: ( result.body.properties.outputs )
+    repeat:
+      condition: ( contains(['Accepted', 'Running'], provisioningState) )
+      delay: PT15S
+      timeout: PT38M
+    catch:
+      condition: ( result.status == `400` )
+      output:
+        failure: ( result.body.error )
 
 - message: ( ['Failure ', failure.code] )
   condition: ( failure != null )
@@ -59,12 +142,18 @@ operations:
     message: ( failure.message )
     details: ( failure )
 
-- message: Web app deployment sync
+# App Update / Import / Migrate / Export
+
+- message: Updating web application
   values:
     request:
       path:
-        name: ( deployment.outputs.siteName.value )
+        resourceGroupName: ( app.resourceGroup )
+        name: ( step2.outputs.siteName.value )
   operations:
+
+  # Update Web App code
+
   - message: Listing deployments
     request: apis/azure/WebApps_ListDeployments.yaml
 
@@ -73,15 +162,113 @@ operations:
       request:
         body:
           format: basic
-          url: "{{ app.sourcecontrol.repoUrl }}"          
+          url: "{{ app.sourcecontrol.repoUrl }}#{{ app.sourcecontrol.branch }}"          
     request: apis/scm/WebApps_Deploy.yaml
 
   - message: Listing deployments
     request: apis/azure/WebApps_ListDeployments.yaml
 
-- message: Running database migration
-  values:
-    request:
-      siteUri: ( join('', ['http://', deployment.outputs.siteUri.value.to_string(@)]) )
-  request: apis/app/Blogs_Migrate.yaml
+  # - message: Importing database to storage account
+  #   condition: ( storage.importName != null )
+  #   values:
+  #     request:
+  #       path:
+  #         serverName: ( step2.outputs.serverName.value )
+  #         databaseName: ( step2.outputs.databaseName.value )
+  #       body:
+  #         authenticationType: SQL
+  #         administratorLogin: ( database.administratorLogin )
+  #         administratorLoginPassword: "( database.administratorLoginPassword )"
+  #         storageKeyType: StorageAccessKey
+  #         storageKey: ( storage.key )
+  #         storageUri: ( join('', [step1.outputs.storageAccount.value.primaryEndpoints.blob, storage.containerName, '/', to_string(storage.importName)]) )
+  #         databaseName: sampledb
+  #         edition: Basic
+  #         serviceObjectiveName: Basic
+  #         maxSizeBytes": "2147483648"
+  #   request: apis/azure/Databases_Import.yaml
+  #   output:
+  #     database:
+  #       import:
+  #         uri: ( result.headers.Location[0] )
+  #   catch:
+  #     condition: ( result.status == `400` )
+  #     output:
+  #       failure: ( result.body )
 
+  # - message: Monitoring import...
+  #   condition: ( failure != null && database.import.uri != null )
+  #   values:
+  #     request:
+  #       path: (database.import.uri)
+  #   request: apis/azure/Databases_ImportExportOperationResults.yaml
+  #   output:
+  #     database:
+  #       import:
+  #         properties: ( result.body.properties || result.body )
+  #   repeat:
+  #     condition: ( database.import.properties.status == 'Pending' || starts_with(database.import.properties.status, 'Running') )
+  #     delay: PT15S
+  #     timeout: PT38M
+
+  - message: ( ['Failure ', failure.code] )
+    condition: ( failure != null )
+    throw: 
+      message: ( failure.message )
+      details: ( failure )
+
+  # Run migration to update database schema
+
+  - message: Running database migration
+    values:
+      request:
+        path:
+          name: ( step2.outputs.siteName.value )
+    request: apis/app/Blogs_Migrate.yaml
+
+  # Export database to storage if needed
+
+  - message: Exporting database to storage account
+    condition: ( storage.exportName != null )
+    values:
+      request:
+        path:
+          serverName: ( step2.outputs.serverName.value )
+          databaseName: ( step2.outputs.databaseName.value )
+        body:
+          authenticationType: SQL
+          administratorLogin: ( database.administratorLogin )
+          administratorLoginPassword: "( database.administratorLoginPassword )"
+          storageKeyType: StorageAccessKey
+          storageKey: ( storage.key )
+          storageUri: ( join('', [step1.outputs.storageAccount.value.primaryEndpoints.blob, storage.containerName, '/', to_string(storage.exportName)]) )
+    request: apis/azure/Databases_Export.yaml
+    output:
+      database:
+        export:
+          uri: ( result.headers.Location[0] )
+    catch:
+      condition: ( result.status == `400` )
+      output:
+        failure: ( result.body )
+
+  - message: Monitoring export...
+    condition: ( failure != null && database.export.uri != null )
+    values:
+      request:
+        path: (database.export.uri)
+    request: apis/azure/Databases_ImportExportOperationResults.yaml
+    output:
+      database:
+        export:
+          properties: ( result.body.properties | result.body )
+    repeat:
+      condition: ( database.export.properties.status == 'Pending' || starts_with(database.export.properties.status, 'Running') )
+      delay: PT15S
+      timeout: PT38M
+
+  - message: ( ['Failure ', failure.code] )
+    condition: ( failure != null )
+    throw: 
+      message: ( failure.message )
+      details: ( failure )

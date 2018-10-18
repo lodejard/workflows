@@ -55,6 +55,7 @@
       "hostingPlanName": "[concat('hostingplan', uniqueString(resourceGroup().id))]",
       "webSiteName": "[concat('webSite', uniqueString(resourceGroup().id))]",
       "sqlserverName": "[concat('sqlserver', uniqueString(resourceGroup().id))]",
+      "containerName": "{{ storage.containerName }}",
       "databaseName": "sampledb"
     },
     "resources": [
@@ -88,7 +89,28 @@
               "collation": "SQL_Latin1_General_CP1_CI_AS",
               "maxSizeBytes": "1073741824",
               "requestedServiceObjectiveName": "Basic"
-            }
+            },
+            "resources": [
+              {{# if storage.importName }}
+              {
+                "name": "Import",
+                "type": "extensions",
+                "apiVersion": "2014-04-01",
+                "properties": {
+                  "operationMode": "Import",
+                  "authenticationType": "SQL",
+                  "administratorLogin": "{{ database.administratorLogin }}",
+                  "administratorLoginPassword": "{{ database.administratorLoginPassword }}",
+                  "storageKeyType": "StorageAccessKey",
+                  "storageKey": "{{ storage.key }}",
+                  "storageUri": "{{ step1.outputs.storageAccount.value.primaryEndpoints.blob }}{{ storage.containerName }}/{{ storage.importName }}"
+                },
+                "dependsOn": [
+                  "[resourceId('Microsoft.Sql/servers/databases', variables('sqlserverName'), variables('databaseName'))]"
+                ]
+              }
+              {{/ if }}
+            ]
           },
           {
             "type": "firewallrules",
@@ -392,6 +414,14 @@
       "siteName": {
         "type": "string",
         "value": "[variables('webSiteName')]"
+      },
+      "serverName": {
+        "type": "string",
+        "value": "[variables('sqlserverName')]"
+      },
+      "databaseName": {
+        "type": "string",
+        "value": "[variables('databaseName')]"
       },
       "siteUri": {
         "type": "string",

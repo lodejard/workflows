@@ -1,5 +1,5 @@
 
-# https://docs.microsoft.com/en-us/rest/api/resources/deployments/deployments_get
+# https://docs.microsoft.com/en-us/rest/api/appservice/webapps/webapps_getdeployment
 
 method: GET
 url: https://management.azure.com/subscriptions/{{ request.path.subscriptionId }}/resourcegroups/{{ request.path.resourceGroupName }}/providers/Microsoft.Web/sites/{{ request.path.name }}/deployments/{{ request.path.id }}?api-version=2018-02-01
