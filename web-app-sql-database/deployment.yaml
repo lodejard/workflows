@@ -1,0 +1,58 @@
+
+operations:
+- message: Generating deployment
+  template: {{ template }}
+  output:
+    deployment:
+      put:
+        properties:          
+          template: ( result )
+          
+- message: Create resource group
+  values:
+    request:
+      path:
+        resourceGroupName: ( deployment.resourceGroupName )
+      body:
+        location: ( deployment.location )
+  request: apis/azure/ResourceGroups_CreateOrUpdate.yaml
+
+- message: Create deployment
+  values:
+    request:
+      path:
+        resourceGroupName: ( deployment.resourceGroupName )
+        deploymentName: ( deployment.deploymentName )
+      body: ( deployment.put )
+  request: apis/azure/Deployments_CreateOrUpdate.yaml
+  catch:
+    condition: ( result.status == `400` )
+    output:
+      failure: ( result.body.error )
+
+- message: Monitoring deployment...
+  condition: ( failure == null )
+  values:
+    request:
+      path:
+        resourceGroupName: ( deployment.resourceGroupName )
+        deploymentName: ( deployment.deploymentName )
+  request: apis/azure/Deployments_Get.yaml
+  output:
+    failure: ( result.body.properties.error )
+    deployment: 
+      get: ( result.body )
+  repeat:
+    condition: ( contains(['Accepted', 'Running'], deployment.get.properties.provisioningState) )
+    delay: PT15S
+    timeout: PT38M
+  catch:
+    condition: ( result.status == `400` )
+    output:
+      failure: ( result.body.error )
+
+- condition: ( failure != null )
+  throw: 
+    message: ( failure.message || 'Operation failed' )
+    details: ( failure )
+
